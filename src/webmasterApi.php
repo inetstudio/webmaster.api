@@ -101,13 +101,13 @@ class webmasterApi
      *
      * @param string $accessToken Access token from Yandex ouath serverh
      *
-     * @return webmasterApi
+     * @return object
      */
     public static function initApi($accessToken)
     {
         $wmApi = new static($accessToken);
         if (!empty($wmApi->lastError)) {
-            return (object)array('error_message' => $wmApi->lastError);
+            return (object) array('error_message' => $wmApi->lastError);
         }
 
         return $wmApi;
@@ -386,8 +386,8 @@ class webmasterApi
     /**
      * Save error message and return false
      *
-     * @param string  $message  Text of message
-     * @param boolean $json     Return false as json error
+     * @param string $message  Text of message
+     * @param bool   $json     Return false as json error
      *
      * @return false|object
      */
@@ -409,8 +409,8 @@ class webmasterApi
     /**
      * Save and log notice message and return false
      *
-     * @param string  $message  Text of message
-     * @param boolean $json     Return false as json error
+     * @param string $message  Text of message
+     * @param bool   $json     Return false as json error
      *
      * @return false|object
      */
@@ -442,7 +442,7 @@ class webmasterApi
     private function getUserID()
     {
         $response = $this->get('/user/');
-        if (!isset($response->user_id) || !intval($response->user_id)) {
+        if (!isset($response->user_id) || !(int) $response->user_id) {
             $message = "Can't resolve USER ID";
             if (isset($response->error_message)) {
                 $message .= '. ' . $response->error_message;
