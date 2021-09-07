@@ -31,49 +31,23 @@ namespace hardworm\webmaster\api;
 
 class webmasterApi
 {
-
     /**
      * Access token to Webmaster Api
-     *
      * Свойство заполняется при инициализации объекта
-     *
-     *
-     * @var string
      */
-    private $accessToken;
+    private string $accessToken;
 
-    /**
-     * Url of webmaster API
-     *
-     * @var string
-     */
-    private $apiUrl = 'https://api.webmaster.yandex.net/v4.1';
+    /** Url of webmaster API */
+    private string $apiUrl = 'https://api.webmaster.yandex.net/v4.1';
 
-    /**
-     * UserID in webmaster
-     *
-     * @var int
-     */
-    public $userID;
+    /** UserID in webmaster */
+    public int $userID;
 
+    /** Last error message */
+    public string $lastError;
 
-    /**
-     * Last error message
-     *
-     * @var string
-     */
-    public $lastError;
-
-    /**
-     *
-     * User trigger errors
-     *
-     * Передавать ли возникающие ошибки в стандартный поток ошибок/
-     *
-     * @var boolean
-     */
-    public $triggerError = true;
-
+    /**  User trigger errors. Передавать ли возникающие ошибки в стандартный поток ошибок */
+    public bool $triggerError = true;
 
     /**
      * webmasterApi constructor.
@@ -83,7 +57,7 @@ class webmasterApi
      *
      * @param string $accessToken  Access token from Yandex ouath serverh
      */
-    protected function __construct($accessToken)
+    protected function __construct(string $accessToken)
     {
         $this->accessToken = $accessToken;
         $response = $this->getUserID();
@@ -100,14 +74,12 @@ class webmasterApi
      * Коорректный способ создания объектов класса: При ошибке возвращает объект со стандартными ошибками.
      *
      * @param string $accessToken Access token from Yandex ouath serverh
-     *
-     * @return object
      */
-    public static function initApi($accessToken)
+    public static function initApi(string $accessToken): object
     {
         $wmApi = new static($accessToken);
         if (!empty($wmApi->lastError)) {
-            return (object) array('error_message' => $wmApi->lastError);
+            return (object) ['error_message' => $wmApi->lastError];
         }
 
         return $wmApi;
@@ -117,26 +89,21 @@ class webmasterApi
     /**
      * Get handler url for this resource
      *
-     * Простоая обертка, возвращающая правильный путь к ручке API
+     * Простая обертка, возвращающая правильный путь к ручке API
      * На самом деле все что она делает - дописывает /user/userID/, кроме, непосредственно, ручки /user/
-     *
-     * @param string $resource
-     *
-     * @return string
      */
-    public function getApiUrl($resource)
+    public function getApiUrl(string $resource): string
     {
         $apiUrl = $this->apiUrl;
         if ($resource !== '/user/') {
             if (!$this->userID) {
-                return $this->errorCritical("Can't get hand {$resource} without userID");
+                return $this->errorCritical("Can't get hand $resource without userID");
             }
             $apiUrl .= '/user/' . $this->userID;
         }
 
         return $apiUrl . $resource;
     }
-
 
     /**
      * Get request to hand
@@ -151,55 +118,36 @@ class webmasterApi
      *
      * @return object
      */
-    protected function get($resource, $data = array())
+    protected function get(string $resource, array $data = []): object
     {
         $apiUrl = $this->getApiUrl($resource);
-
         $headers = $this->getDefaultHttpHeaders();
-
         $url = $apiUrl . '?' . $this->dataToString($data);
 
-        $allow_url_fopen = ini_get('allow_url_fopen');
-        if (function_exists('curl_init')) {
-            // Шлем запрос в курл
-            $ch = curl_init($url);
-            // основные опции curl
-            $this->curlOpts($ch);
-            // передаем заголовки
-            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-            $response = curl_exec($ch);
-            $curl_error = curl_error($ch);
-            curl_close($ch);
-        } elseif (!empty($allow_url_fopen)) {
-            $opts = array(
-                'http' => array(
-                    'method' => 'GET',
-                    'header' => $headers
-                )
-            );
-
-            # создание контекста потока
-            $context = stream_context_create($opts);
-            # отправляем запрос и получаем ответ от сервера
-            $response = @file_get_contents($url, 0, $context);
-
-        } else {
-            return $this->errorCritical('CURL not installed & file_get_contents disabled');
-        }
+        // Шлем запрос в курл
+        $ch = curl_init($url);
+        // основные опции curl
+        $this->curlOpts($ch);
+        // передаем заголовки
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        $response = curl_exec($ch);
+        $curl_error = curl_error($ch);
+        curl_close($ch);
 
 
         if (!$response) {
-            return $this->errorCritical('Error in curl when get [' . $url . '] ' . (isset($curl_error) ? $curl_error : ''));
+            return $this->errorCritical(
+                'Error in curl when get [' . $url . '] ' . ($curl_error ?? '')
+            );
         }
         $response = json_decode($response, false, 512, JSON_BIGINT_AS_STRING);
-
 
         if (!is_object($response)) {
             return $this->errorCritical('Unknown error in response: Not object given');
         }
+
         return $response;
     }
-
 
     /**
      * Post data to hand
@@ -211,42 +159,22 @@ class webmasterApi
      *
      * @return false|JsonSerializable
      */
-    protected function post($resource, $data)
+    protected function post(string $resource, array $data)
     {
         $url = $this->getApiUrl($resource);
-
         $headers = $this->getDefaultHttpHeaders();
-
         $dataJson = json_encode($data);
 
-        $allow_url_fopen = ini_get('allow_url_fopen');
-        if (function_exists('curl_init')) {
-            // Шлем запрос в курл
-            $ch = curl_init($url);
-            // основные опции курл
-            $this->curlOpts($ch);
-            // передаем заголовки
-            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-            curl_setopt($ch, CURLOPT_POST, 1);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $dataJson);
-            $response = curl_exec($ch);
-            curl_close($ch);
-        } elseif (!empty($allow_url_fopen)) {
-            $opts = array(
-                'http' => array(
-                    'method' => 'POST',
-                    'content' => $dataJson,
-                    'header' => $headers
-                )
-            );
-
-            # создание контекста потока
-            $context = stream_context_create($opts);
-            # отправляем запрос и получаем ответ от сервера
-            $response = @file_get_contents($url, 0, $context);
-        } else {
-            return $this->errorCritical('CURL not installed & file_get_contents disabled');
-        }
+        // Шлем запрос в курл
+        $ch = curl_init($url);
+        // основные опции курл
+        $this->curlOpts($ch);
+        // передаем заголовки
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $dataJson);
+        $response = curl_exec($ch);
+        curl_close($ch);
 
         if (!$response) {
             return $this->errorCritical('Unknown error in curl');
@@ -256,6 +184,7 @@ class webmasterApi
         if (!is_object($response)) {
             return $this->errorCritical('Unknown error in curl');
         }
+
         return $response;
     }
 
@@ -269,47 +198,26 @@ class webmasterApi
      * @param $data array Array with request params (useful to CURLOPT_POSTFIELDS: http://php.net/curl_setopt )
      * @return false|object
      */
-    protected function delete($resource, $data = array())
+    protected function delete(string $resource, array $data = [])
     {
         $url = $this->getApiUrl($resource);
         $headers = $this->getDefaultHttpHeaders();
         $dataJson = json_encode($data);
 
-        $allow_url_fopen = ini_get('allow_url_fopen');
-        if (function_exists('curl_init')) {
-            // Шлем запрос в курл
-            $ch = curl_init($url);
-            // основные опции курл
-            $this->curlOpts($ch);
-            // передаем заголовки
-            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $dataJson);
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
-            if ($httpCode == '204') {
-                return (object)array(true);
-            }
-        } elseif (!empty($allow_url_fopen)) {
-            $opts = array(
-                'http' => array(
-                    'method' => 'DELETE',
-                    'content' => $dataJson,
-                    'header' => $headers
-                )
-            );
+        // Шлем запрос в курл
+        $ch = curl_init($url);
+        // основные опции курл
+        $this->curlOpts($ch);
+        // передаем заголовки
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $dataJson);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
 
-            # создание контекста потока
-            $context = stream_context_create($opts);
-            # отправляем запрос и получаем ответ от сервера
-            $response = @file_get_contents($url, 0, $context);
-
-            if (in_array('HTTP/1.1 204 No Content', $http_response_header)) {
-                return (object)array(true);
-            }
-        } else {
-            return $this->errorCritical('CURL not installed & file_get_contents disabled');
+        if ($httpCode == '204') {
+            return (object)[true];
         }
 
         if (!$response) {
@@ -317,6 +225,7 @@ class webmasterApi
         }
 
         $response = json_decode($response);
+
         if (!is_object($response)) {
             return $this->errorCritical('Unknown error in curl');
         }
@@ -324,14 +233,15 @@ class webmasterApi
         return $response;
     }
 
-    protected function getDefaultHttpHeaders()
+    protected function getDefaultHttpHeaders(): array
     {
-        return array(
+        return [
             'Authorization: OAuth ' . $this->accessToken,
             'Accept: application/json',
             'Content-type: application/json'
-        );
+        ];
     }
+
     /**
      *
      * Set Curl Options
@@ -342,7 +252,7 @@ class webmasterApi
      *
      * @return true
      */
-    protected function curlOpts(&$ch)
+    protected function curlOpts(&$ch): bool
     {
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
@@ -363,9 +273,9 @@ class webmasterApi
      * @param array $data
      * @return string
      */
-    private function dataToString($data)
+    private function dataToString(array $data): string
     {
-        $queryString = array();
+        $queryString = [];
         foreach ($data as $param => $value) {
             if (is_string($value) || is_int($value) || is_float($value)) {
                 $queryString[] = urlencode($param) . '=' . urlencode($value);
@@ -391,7 +301,7 @@ class webmasterApi
      *
      * @return false|object
      */
-    private function errorCritical($message, $json = true)
+    private function errorCritical(string $message, bool $json = true)
     {
         $this->lastError = $message;
         if ($json) {
@@ -399,7 +309,7 @@ class webmasterApi
                 trigger_error($message, E_USER_ERROR);
             }
 
-            return (object)array('error_code' => 'CRITICAL_ERROR', 'error_message' => $message);
+            return (object)['error_code' => 'CRITICAL_ERROR', 'error_message' => $message];
         }
 
         return false;
@@ -414,7 +324,7 @@ class webmasterApi
      *
      * @return false|object
      */
-    private function errorWarning($message, $json = true)
+    private function errorWarning(string $message, bool $json = true)
     {
         $this->lastError = $message;
         if ($json) {
@@ -422,7 +332,7 @@ class webmasterApi
                 trigger_error($message, E_USER_NOTICE);
             }
 
-            return (object)array('error_code' => 'CRITICAL_ERROR', 'error_message' => $message);
+            return (object) ['error_code' => 'CRITICAL_ERROR', 'error_message' => $message];
         }
 
         return false;
@@ -468,11 +378,10 @@ class webmasterApi
      *
      * @return object Json
      */
-    public function addHost($url)
+    public function addHost(string $url): object
     {
-        return $this->post('/hosts/', array('host_url' => $url));
+        return $this->post('/hosts/', ['host_url' => $url]);
     }
-
 
     /**
      * Delete host from webmaster
@@ -485,7 +394,7 @@ class webmasterApi
      *
      * @return object
      */
-    public function deleteHost($hostID)
+    public function deleteHost(string $hostID): object
     {
         return $this->delete('/hosts/' . $hostID . '/');
     }
@@ -501,7 +410,7 @@ class webmasterApi
      *
      * @return object Json
      */
-    public function getHosts()
+    public function getHosts(): object
     {
         return $this->get('/hosts/');
     }
@@ -517,7 +426,7 @@ class webmasterApi
      *
      * @return object
      */
-    public function checkVerification($hostID)
+    public function checkVerification(string $hostID): object
     {
         return $this->get('/hosts/' . $hostID . '/verification/');
     }
@@ -537,9 +446,9 @@ class webmasterApi
      *
      * @return false|object
      */
-    public function verifyHost($hostID, $type)
+    public function verifyHost(string $hostID, string $type): object
     {
-        return $this->post('/hosts/' . $hostID . '/verification/?verification_type=' . $type, array());
+        return $this->post('/hosts/' . $hostID . '/verification/?verification_type=' . $type, []);
     }
 
     /**
@@ -553,7 +462,7 @@ class webmasterApi
      *
      * @return object Json
      */
-    public function getHostInfo($hostID)
+    public function getHostInfo(string $hostID): object
     {
         return $this->get('/hosts/' . $hostID . '/');
     }
@@ -569,7 +478,7 @@ class webmasterApi
      *
      * @return object Json
      */
-    public function getHostSummary($hostID)
+    public function getHostSummary(string $hostID): object
     {
         return $this->get('/hosts/' . $hostID . '/summary/');
     }
@@ -585,7 +494,7 @@ class webmasterApi
      *
      * @return object Json
      */
-    public function getHostOwners($hostID)
+    public function getHostOwners(string $hostID): object
     {
         return $this->get('/hosts/' . $hostID . '/owners/');
     }
@@ -600,20 +509,24 @@ class webmasterApi
      * Обратите внимание: Метод не возвращает те файлы, которые добавлены через Яндекс.Вебмастер но еще не используются
      * при обходе. Для получения списка этих файлов используйте метод getHostUserSitemaps
      *
-     * @param string $hostID   Host id in webmaster
-     * @param string $parentID Id of parent sitemap
-     * @param int $limit limit of sitemaps
-     * @param string $fromSitemapID id starting sitemap (excluded)
-     *
-     * @link https://tech.yandex.ru/webmaster/doc/dg/reference/host-sitemaps-get-docpage/
+     * @param string      $hostID        Host id in webmaster
+     * @param null|string $parentID      Id of parent sitemap
+     * @param null|int    $limit         limit of sitemaps
+     * @param null|string $fromSitemapID id starting sitemap (excluded)
      *
      * @return object Json
+     * @link https://tech.yandex.ru/webmaster/doc/dg/reference/host-sitemaps-get-docpage/
+     *
      */
-    public function getHostSitemaps($hostID, $parentID = null, $limit = 10, $fromSitemapID = null)
-    {
-        $get = array(
-            'limit' => $limit,
-        );
+    public function getHostSitemaps(
+        string $hostID,
+        ?string $parentID = null,
+        ?int $limit = null,
+        ?string $fromSitemapID = null
+    ): object {
+        $get = [
+            'limit' => $limit ?? 10,
+        ];
         if ($parentID) {
             $get['parent_id'] = $parentID;
         }
@@ -623,7 +536,6 @@ class webmasterApi
 
         return $this->get('/hosts/' . $hostID . '/sitemaps/', $get);
     }
-
 
     /**
      * Get list of user added sitemap files
@@ -636,7 +548,7 @@ class webmasterApi
      *
      * @return object Json
      */
-    public function getHostUserSitemaps($hostID)
+    public function getHostUserSitemaps(string $hostID): object
     {
         return $this->get('/hosts/' . $hostID . '/user-added-sitemaps/');
     }
@@ -644,7 +556,7 @@ class webmasterApi
     /**
      * Add new sitemap
      *
-     * Добаление новой карты сайта
+     * Добавление новой карты сайта
      *
      * @param string $hostID Host id in webmaster
      * @param string $url    URL with new sitemap
@@ -653,9 +565,9 @@ class webmasterApi
      *
      * @return object
      */
-    public function addSitemap($hostID, $url)
+    public function addSitemap(string $hostID, string $url): object
     {
-        return $this->post('/hosts/' . $hostID . '/user-added-sitemaps/', array('url' => $url));
+        return $this->post('/hosts/' . $hostID . '/user-added-sitemaps/', ['url' => $url]);
     }
 
     /**
@@ -674,7 +586,7 @@ class webmasterApi
      *
      * @return object Json
      */
-    public function deleteSitemap($hostID, $sitemapId)
+    public function deleteSitemap(string $hostID, string $sitemapId): object
     {
         return $this->delete('/hosts/' . $hostID . '/user-added-sitemaps/' . $sitemapId . '/');
     }
@@ -694,7 +606,7 @@ class webmasterApi
      *
      * @return object Json
      */
-    public function getIndexingHistory($hostID, $dateFrom = null, $dateTo = null)
+    public function getIndexingHistory(string $hostID, ?int $dateFrom = null, ?int $dateTo = null): object
     {
         if (!$dateFrom) {
             $dateFrom = strtotime('-1 month');
@@ -702,17 +614,14 @@ class webmasterApi
         if (!$dateTo) {
             $dateTo = time();
         }
-        if (!is_int($dateTo) || !$dateTo) {
-            return $this->errorCritical("Bad timestamp to {$dateTo}");
-        }
-        if (!is_int($dateFrom) || !$dateFrom) {
-            return $this->errorCritical("Bad timestamp to {$dateFrom}");
-        }
         if ($dateTo < $dateFrom) {
             return $this->errorCritical("Date to can't be smaller then Date from");
         }
 
-        return $this->get('/hosts/' . $hostID . '/indexing/history/', array('date_from' => date(DATE_ATOM, $dateFrom), 'date_to' => date(DATE_ATOM, $dateTo)));
+        return $this->get(
+            '/hosts/' . $hostID . '/indexing/history/',
+            ['date_from' => date(DATE_ATOM, $dateFrom), 'date_to' => date(DATE_ATOM, $dateTo)]
+        );
     }
 
     /**
@@ -721,24 +630,16 @@ class webmasterApi
      * Возвращает URL страниц, участвующих в результатах поиска — до 50 000
      *
      * @param string $hostID Host id in webmaster
-     * @param int    $offset Offset list. The minimum value is 0
-     * @param int    $limit  The size of the page (1-100)
+     * @param null|int    $offset Offset list. The minimum value is 0
+     * @param null|int    $limit  The size of the page (1-100)
      *
      * @link https://tech.yandex.ru/webmaster/doc/dg/reference/hosts-indexing-samples-docpage/
      *
      * @return object Json
      */
-    public function getIndexingSamples($hostID, $offset = 0, $limit = 100)
+    public function getIndexingSamples(string $hostID, ?int $offset = 0, ?int $limit = 100): object
     {
-        if (!is_int($offset)) {
-            return $this->errorCritical("Bad offset to {$offset}");
-        }
-
-        if (!is_int($limit)) {
-            return $this->errorCritical("Bad limit to {$limit}");
-        }
-
-        return $this->get('/hosts/' . $hostID . '/indexing/samples/', array('offset' => $offset, 'limit' => $limit));
+        return $this->get('/hosts/' . $hostID . '/indexing/samples/', ['offset' => $offset, 'limit' => $limit]);
     }
 
     /**
@@ -754,7 +655,7 @@ class webmasterApi
      *
      * @return object Json
      */
-    public function getSearchUrlHistory($hostID, $dateFrom = null, $dateTo = null)
+    public function getSearchUrlHistory(string $hostID, ?int $dateFrom = null, ?int $dateTo = null): object
     {
         if (!$dateFrom) {
             $dateFrom = strtotime('-1 month');
@@ -762,17 +663,14 @@ class webmasterApi
         if (!$dateTo) {
             $dateTo = time();
         }
-        if (!is_int($dateTo)) {
-            return $this->errorCritical("Bad timestamp to {$dateTo}");
-        }
-        if (!is_int($dateFrom)) {
-            return $this->errorCritical("Bad timestamp to {$dateFrom}");
-        }
         if ($dateTo < $dateFrom) {
             return $this->errorCritical("Date to can't be smaller then Date from");
         }
 
-        return $this->get('/hosts/' . $hostID . '/search-urls/in-search/history/', array('date_from' => date(DATE_ATOM, $dateFrom), 'date_to' => date(DATE_ATOM, $dateTo)));
+        return $this->get(
+            '/hosts/' . $hostID . '/search-urls/in-search/history/',
+            ['date_from' => date(DATE_ATOM, $dateFrom), 'date_to' => date(DATE_ATOM, $dateTo)]
+        );
     }
 
     /**
@@ -781,24 +679,23 @@ class webmasterApi
      * Возвращает URL страниц, участвующих в результатах поиска — до 50 000.
      *
      * @param string $hostID Host id in webmaster
-     * @param int    $offset Offset list. The minimum value is 0
-     * @param int    $limit  The size of the page (1-100)
+     * @param null|int    $offset Offset list. The minimum value is 0
+     * @param null|int    $limit  The size of the page (1-100)
      *
      * @link https://tech.yandex.ru/webmaster/doc/dg/reference/hosts-indexing-insearch-samples-docpage/#hosts-indexing-insearch-samples
      *
      * @return object Json
      */
-    public function getSearchUrlSamples($hostID, $offset = 0, $limit = 100)
+    public function getSearchUrlSamples(string $hostID, ?int $offset = 0, ?int $limit = 100): object
     {
-        if (!is_int($offset)) {
-            return $this->errorCritical("Bad offset to {$offset}");
-        }
-
-        if (!is_int($limit) || $limit > 100 || $limit < 0) {
+        if ($limit > 100 || $limit < 0) {
             return $this->errorCritical("Bad limit to {$limit}");
         }
 
-        return $this->get('/hosts/' . $hostID . '/search-urls/in-search/samples/', array('offset' => $offset, 'limit' => $limit));
+        return $this->get(
+            '/hosts/' . $hostID . '/search-urls/in-search/samples/',
+            ['offset' => $offset, 'limit' => $limit]
+        );
     }
 
     /**
@@ -814,7 +711,7 @@ class webmasterApi
      *
      * @return object Json
      */
-    public function getSearchUrlEventHistory($hostID, $dateFrom = null, $dateTo = null)
+    public function getSearchUrlEventHistory(string $hostID, ?int $dateFrom = null, ?int $dateTo = null): object
     {
         if (!$dateFrom) {
             $dateFrom = strtotime('-1 month');
@@ -822,17 +719,15 @@ class webmasterApi
         if (!$dateTo) {
             $dateTo = time();
         }
-        if (!is_int($dateTo)) {
-            return $this->errorCritical("Bad timestamp to {$dateTo}");
-        }
-        if (!is_int($dateFrom)) {
-            return $this->errorCritical("Bad timestamp to {$dateFrom}");
-        }
+
         if ($dateTo < $dateFrom) {
             return $this->errorCritical("Date to can't be smaller then Date from");
         }
 
-        return $this->get('/hosts/' . $hostID . '/search-urls/events/history/', array('date_from' => date(DATE_ATOM, $dateFrom), 'date_to' => date(DATE_ATOM, $dateTo)));
+        return $this->get(
+            '/hosts/' . $hostID . '/search-urls/events/history/',
+            ['date_from' => date(DATE_ATOM, $dateFrom), 'date_to' => date(DATE_ATOM, $dateTo)]
+        );
     }
 
     /**
@@ -840,25 +735,24 @@ class webmasterApi
      *
      * Возвращает URL страниц, появившихся в поиске или исключенных из него — до 50 000.
      *
-     * @param string $hostID Host id in webmaster
-     * @param int    $offset Offset list. The minimum value is 0
-     * @param int    $limit  The size of the page (1-100)
+     * @param string   $hostID Host id in webmaster
+     * @param int|null $offset Offset list. The minimum value is 0
+     * @param int|null $limit  The size of the page (1-100)
      *
      * @link https://tech.yandex.ru/webmaster/doc/dg/reference/hosts-search-events-samples-docpage/#hosts-search-events-samples
      *
      * @return object Json
      */
-    public function getSearchUrlEventHistorySamples($hostID, $offset = 0, $limit = 100)
+    public function getSearchUrlEventHistorySamples(string $hostID, ?int $offset = 0, ?int $limit = 100): object
     {
-        if (!is_int($offset)) {
-            return $this->errorCritical("Bad offset to {$offset}");
-        }
-
-        if (!is_int($limit) || $limit > 100 || $limit < 0) {
+        if ($limit > 100 || $limit < 0) {
             return $this->errorCritical("Bad limit to {$limit}");
         }
 
-        return $this->get('/hosts/' . $hostID . '/search-urls/events/history/', array('offset' => $offset, 'limit' => $limit));
+        return $this->get(
+            '/hosts/' . $hostID . '/search-urls/events/history/',
+            ['offset' => $offset, 'limit' => $limit]
+        );
     }
 
     /**
@@ -872,7 +766,7 @@ class webmasterApi
      *
      * @return object
      */
-    public function getDiagnostics($hostID)
+    public function getDiagnostics(string $hostID): object
     {
         return $this->get('/hosts/' . $hostID . '/diagnostics/');
     }
@@ -885,40 +779,42 @@ class webmasterApi
      * @param string   $hostID   Host id in webmaster
      * @param null|int $dateFrom Date from in timestamp
      * @param null|int $dateTo   Date to in timestamp
-     * @param int      $offset   Offset list. The minimum value is 0
-     * @param int      $limit    The size of the page (1-100)
+     * @param null|int $offset   Offset list. The minimum value is 0
+     * @param null|int $limit    The size of the page (1-100)
      *
      * @link https://tech.yandex.ru/webmaster/doc/dg/reference/host-recrawl-get-docpage/#host-recrawl-get
      *
      * @return object
      */
-    public function getQueueRecrawl($hostID, $dateFrom = null, $dateTo = null, $offset = 0, $limit = 100)
-    {
+    public function getQueueRecrawl(
+        string $hostID,
+        ?int $dateFrom = null,
+        ?int $dateTo = null,
+        ?int $offset = 0,
+        ?int $limit = 100
+    ): object {
         if (!$dateFrom) {
             $dateFrom = strtotime('-1 month');
         }
         if (!$dateTo) {
             $dateTo = time();
         }
-        if (!is_int($dateTo)) {
-            return $this->errorCritical("Bad timestamp to {$dateTo}");
-        }
-        if (!is_int($dateFrom)) {
-            return $this->errorCritical("Bad timestamp to {$dateFrom}");
-        }
         if ($dateTo < $dateFrom) {
             return $this->errorCritical("Date to can't be smaller then Date from");
         }
-
-        if (!is_int($offset)) {
-            return $this->errorCritical("Bad offset to {$offset}");
-        }
-
-        if (!is_int($limit) || $limit > 100 || $limit < 0) {
+        if ($limit > 100 || $limit < 0) {
             return $this->errorCritical("Bad limit to {$limit}");
         }
 
-        return $this->get('/hosts/' . $hostID . '/recrawl/queue/', array('offset' => $offset, 'limit' => $limit, 'date_from' => date(DATE_ATOM, $dateFrom), 'date_to' => date(DATE_ATOM, $dateTo)));
+        return $this->get(
+            '/hosts/' . $hostID . '/recrawl/queue/',
+            [
+                'offset'    => $offset,
+                'limit'     => $limit,
+                'date_from' => date(DATE_ATOM, $dateFrom),
+                'date_to'   => date(DATE_ATOM, $dateTo)
+            ]
+        );
     }
 
     /**
@@ -933,9 +829,9 @@ class webmasterApi
      *
      * @return object
      */
-    public function addQueueRecrawl($hostID, $url)
+    public function addQueueRecrawl(string $hostID, string $url): object
     {
-        return $this->post('/hosts/' . $hostID . '/recrawl/queue/', array('url' => $url));
+        return $this->post('/hosts/' . $hostID . '/recrawl/queue/', ['url' => $url]);
     }
 
     /**
@@ -949,7 +845,7 @@ class webmasterApi
      *
      * @return object
      */
-    public function getQuotaRecrawl($hostID)
+    public function getQuotaRecrawl(string $hostID): object
     {
         return $this->get('/hosts/' . $hostID . '/recrawl/quota/');
     }
@@ -966,7 +862,7 @@ class webmasterApi
      *
      * @return object
      */
-    public function getStateRecrawlQueue($hostID, $taskID)
+    public function getStateRecrawlQueue(string $hostID, string $taskID): object
     {
         return $this->get('/hosts/' . $hostID . '/recrawl/queue/' . $taskID);
     }
@@ -986,7 +882,7 @@ class webmasterApi
      *
      * @return object Json
      */
-    public function getSqiHistory($hostID, $dateFrom = null, $dateTo = null)
+    public function getSqiHistory(string $hostID, ?int $dateFrom = null, ?int $dateTo = null): object
     {
         if (!$dateFrom) {
             $dateFrom = strtotime('-1 month');
@@ -994,17 +890,14 @@ class webmasterApi
         if (!$dateTo) {
             $dateTo = time();
         }
-        if (!is_int($dateTo)) {
-            return $this->errorCritical("Bad timestamp to {$dateTo}");
-        }
-        if (!is_int($dateFrom)) {
-            return $this->errorCritical("Bad timestamp to {$dateFrom}");
-        }
         if ($dateTo < $dateFrom) {
             return $this->errorCritical("Date to can't be smaller then Date from");
         }
 
-        return $this->get('/hosts/' . $hostID . '/sqi-history/', array('date_from' => date(DATE_ATOM, $dateFrom), 'date_to' => date(DATE_ATOM, $dateTo)));
+        return $this->get(
+            '/hosts/' . $hostID . '/sqi-history/',
+            ['date_from' => date(DATE_ATOM, $dateFrom), 'date_to' => date(DATE_ATOM, $dateTo)]
+        );
     }
 
     /**
@@ -1019,9 +912,9 @@ class webmasterApi
      *
      * @return object Json
      */
-    public function getExternalLinksHistory($hostID, $indicator = 'LINKS_TOTAL_COUNT')
+    public function getExternalLinksHistory(string $hostID, string $indicator = 'LINKS_TOTAL_COUNT'): object
     {
-        return $this->get('/hosts/' . $hostID . '/links/external/history/', array('indicator' => $indicator));
+        return $this->get('/hosts/' . $hostID . '/links/external/history/', ['indicator' => $indicator]);
     }
 
     /**
@@ -1035,26 +928,34 @@ class webmasterApi
      * @param array    $deviceTypeIndicator Device type array('ALL', 'DESKTOP', 'MOBILE_AND_TABLET', 'MOBILE', 'TABLET') Default value: ALL.
      * @param null|int $dateFrom            The start date of the range. If omitted, data is returned for the last week
      * @param null|int $dateTo              The end date of the range. If omitted, data is returned for the last week
-     * @param int      $offset              The list offset. The minimum value is 0. Default value: 0
-     * @param int      $limit               Page size (1-500). Default value: 500
+     * @param null|int $offset              The list offset. The minimum value is 0. Default value: 0
+     * @param null|int $limit               Page size (1-500). Default value: 500
      *
      * @link https://tech.yandex.ru/webmaster/doc/dg/reference/host-search-queries-popular-docpage/
      *
      * @return object Json
      */
-    public function getPopularQueries($hostID, $orderBy = 'TOTAL_CLICKS', $queryIndicator = array(), $deviceTypeIndicator = array(), $dateFrom = null, $dateTo = null, $offset = 0, $limit = 100)
-    {
+    public function getPopularQueries(
+        string $hostID,
+        string $orderBy = 'TOTAL_CLICKS',
+        array $queryIndicator = [],
+        array $deviceTypeIndicator = [],
+        ?int $dateFrom = null,
+        ?int $dateTo = null,
+        ?int $offset = null,
+        ?int $limit = null
+    ): object {
         return $this->get(
             '/hosts/' . $hostID . '/search-queries/popular/',
-            array(
+            [
                 'order_by'              => $orderBy,
                 'query_indicator'       => $queryIndicator,
                 'device_type_indicator' => $deviceTypeIndicator,
                 'date_from'             => $dateFrom,
                 'date_to'               => $dateTo,
-                'offset'                => $offset,
-                'limit'                 => $limit
-            )
+                'offset'                => $offset ?? 0,
+                'limit'                 => $limit ?? 100,
+            ]
         );
     }
 
@@ -1073,11 +974,21 @@ class webmasterApi
      *
      * @return object Json
      */
-    public function getAllQueries($hostID, $queryIndicators = array(), $deviceTypeIndicator = array(), $dateFrom = null, $dateTo = null)
-    {
+    public function getAllQueries(
+        string $hostID,
+        array $queryIndicators = [],
+        array $deviceTypeIndicator = [],
+        ?int $dateFrom = null,
+        ?int $dateTo = null
+    ): object {
         return $this->get(
             '/hosts/' . $hostID . '/search-queries/all/history/',
-            array('query_indicator' => $queryIndicators, 'device_type_indicator' => $deviceTypeIndicator, 'date_from' => $dateFrom, 'date_to' => $dateTo)
+            [
+                'query_indicator'       => $queryIndicators,
+                'device_type_indicator' => $deviceTypeIndicator,
+                'date_from'             => $dateFrom,
+                'date_to'               => $dateTo
+            ]
         );
     }
 
@@ -1097,11 +1008,22 @@ class webmasterApi
      *
      * @return object
      */
-    public function getQueriesById($hostID, $queryId, $queryIndicators = array(), $deviceTypeIndicator = array(), $dateFrom = null, $dateTo = null)
-    {
+    public function getQueriesById(
+        string $hostID,
+        string $queryId,
+        array $queryIndicators = [],
+        array $deviceTypeIndicator = [],
+        ?int $dateFrom = null,
+        ?int $dateTo = null
+    ): object {
         return $this->get(
             '/hosts/' . $hostID . '/search-queries/' . $queryId . '/',
-            array('query_indicator' => $queryIndicators, 'device_type_indicator' => $deviceTypeIndicator, 'date_from' => $dateFrom, 'date_to' => $dateTo)
+            [
+                'query_indicator'       => $queryIndicators,
+                'device_type_indicator' => $deviceTypeIndicator,
+                'date_from'             => $dateFrom,
+                'date_to'               => $dateTo
+            ]
         );
     }
 
@@ -1118,17 +1040,13 @@ class webmasterApi
      *
      * @return object Json
      */
-    public function getOriginalTexts($hostID, $offset = 0, $limit = 100)
+    public function getOriginalTexts(string $hostID, int $offset = 0, int $limit = 100): object
     {
-        if (!is_int($offset)) {
-            return $this->errorCritical("Bad offset to {$offset}");
-        }
-
-        if (!is_int($limit) || $limit > 100 || $limit < 0) {
+        if ($limit > 100 || $limit < 0) {
             return $this->errorCritical("Bad limit to {$limit}");
         }
 
-        return $this->get('/hosts/' . $hostID . '/original-texts/', array('offset' => $offset, 'limit' => $limit));
+        return $this->get('/hosts/' . $hostID . '/original-texts/', ['offset' => $offset, 'limit' => $limit]);
     }
 
     /**
@@ -1145,9 +1063,9 @@ class webmasterApi
      *
      * @return object Json
      */
-    public function addOriginalText($hostID, $content)
+    public function addOriginalText(string $hostID, string $content): object
     {
-        return $this->post('/hosts/' . $hostID . '/original-texts/', array('content' => $content));
+        return $this->post('/hosts/' . $hostID . '/original-texts/', ['content' => $content]);
     }
 
     /**
@@ -1162,7 +1080,7 @@ class webmasterApi
      *
      * @return object Json
      */
-    public function deleteOriginalText($hostID, $textId)
+    public function deleteOriginalText(string $hostID, string $textId): object
     {
         return $this->delete('/hosts/' . $hostID . '/original-texts/' . urlencode($textId) . '/');
     }
@@ -1180,17 +1098,16 @@ class webmasterApi
      *
      * @return object
      */
-    public function getExternalLinks($hostID, $offset = 0, $limit = 100)
+    public function getExternalLinks(string $hostID, int $offset = 0, int $limit = 100): object
     {
-        if (!is_int($offset)) {
-            return $this->errorCritical("Bad offset to {$offset}");
-        }
-
-        if (!is_int($limit) || $limit > 100 || $limit < 0) {
+        if ($limit > 100 || $limit < 0) {
             return $this->errorCritical("Bad limit to {$limit}");
         }
 
-        return $this->get('/hosts/' . $hostID . '/links/external/samples/', array('offset' => $offset, 'limit' => $limit));
+        return $this->get(
+            '/hosts/' . $hostID . '/links/external/samples/',
+            ['offset' => $offset, 'limit' => $limit]
+        );
     }
 
     /**
@@ -1207,17 +1124,16 @@ class webmasterApi
      *
      * @return object
      */
-    public function getBrokenLinks($hostID, array $indicator = array(), $offset = 0, $limit = 100)
+    public function getBrokenLinks(string $hostID, array $indicator = [], int $offset = 0, int $limit = 100): object
     {
-        if (!is_int($offset)) {
-            return $this->errorCritical("Bad offset to {$offset}");
-        }
-
-        if (!is_int($limit) || $limit > 100 || $limit < 0) {
+        if ($limit > 100 || $limit < 0) {
             return $this->errorCritical("Bad limit to {$limit}");
         }
 
-        return $this->get('/hosts/' . $hostID . '/links/internal/broken/samples', array('offset' => $offset, 'limit' => $limit, 'indicator' => $indicator));
+        return $this->get(
+            '/hosts/' . $hostID . '/links/internal/broken/samples',
+            ['offset' => $offset, 'limit' => $limit, 'indicator' => $indicator]
+        );
     }
 
     /**
@@ -1233,17 +1149,16 @@ class webmasterApi
      *
      * @return object
      */
-    public function getBrokenLinksHistory($hostID, $offset = 0, $limit = 100)
+    public function getBrokenLinksHistory(string $hostID, int $offset = 0, int $limit = 100): object
     {
-        if (!is_int($offset)) {
-            return $this->errorCritical("Bad offset to {$offset}");
-        }
-
-        if (!is_int($limit) || $limit > 100 || $limit < 0) {
+        if ($limit > 100 || $limit < 0) {
             return $this->errorCritical("Bad limit to {$limit}");
         }
 
-        return $this->get('/hosts/' . $hostID . '/links/internal/broken/history/', array('offset' => $offset, 'limit' => $limit));
+        return $this->get(
+            '/hosts/' . $hostID . '/links/internal/broken/history/',
+            ['offset' => $offset, 'limit' => $limit]
+        );
     }
 
     /**
@@ -1257,7 +1172,7 @@ class webmasterApi
      *
      * @return object
      */
-    public function getImportantUrls($hostID)
+    public function getImportantUrls(string $hostID): object
     {
         return $this->get('/hosts/' . $hostID . '/important-urls');
     }
@@ -1274,9 +1189,9 @@ class webmasterApi
      *
      * @return object
      */
-    public function getImportantUrlsHistory($hostID, $url)
+    public function getImportantUrlsHistory(string $hostID, string $url): object
     {
-        return $this->get('/hosts/' . $hostID . '/important-urls/history/', array('url' => $url));
+        return $this->get('/hosts/' . $hostID . '/important-urls/history/', ['url' => $url]);
     }
 
     /**
@@ -1300,19 +1215,19 @@ class webmasterApi
      * @deprecated This function is deprecated. It's only for debug
      *
      *
-     * @param $code
-     * @param $clientId
-     * @param $clientSecret
+     * @param string $code
+     * @param string $clientId
+     * @param string $clientSecret
      * @return object
      */
-    public static function getAccessToken($code, $clientId, $clientSecret)
+    public static function getAccessToken(string $code, string $clientId, string $clientSecret): object
     {
-        $postData = array(
+        $postData = [
             'grant_type'    => 'authorization_code',
             'code'          => $code,
             'client_id'     => $clientId,
             'client_secret' => $clientSecret,
-        );
+        ];
 
         $ch = curl_init('https://oauth.yandex.ru/token');
         curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
@@ -1325,11 +1240,15 @@ class webmasterApi
         $response = curl_exec($ch);
         curl_close($ch);
 
-        if (!$response) die('Unknown error in curl');
+        if (!$response) {
+            die('Unknown error in curl');
+        }
 
         $response = json_decode($response);
 
-        if (!is_object($response)) die('Unknown error in curl');
+        if (!is_object($response)) {
+            die('Unknown error in curl');
+        }
 
         return $response;
     }
