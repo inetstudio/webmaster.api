@@ -284,7 +284,7 @@ class webmasterApi
                     $queryString[] = urlencode($param) . '=' . urlencode($valueItem);
                 }
             } else {
-                $this->errorWarning("Bad type of key {$param}. Value must be string or array");
+                $this->errorWarning("Bad type of key $param. Value must be string or array");
                 continue;
             }
         }
@@ -446,7 +446,7 @@ class webmasterApi
      *
      * @return false|object
      */
-    public function verifyHost(string $hostID, string $type): object
+    public function verifyHost(string $hostID, string $type)
     {
         return $this->post('/hosts/' . $hostID . '/verification/?verification_type=' . $type, []);
     }
@@ -689,7 +689,7 @@ class webmasterApi
     public function getSearchUrlSamples(string $hostID, ?int $offset = 0, ?int $limit = 100): object
     {
         if ($limit > 100 || $limit < 0) {
-            return $this->errorCritical("Bad limit to {$limit}");
+            return $this->errorCritical("Bad limit to $limit");
         }
 
         return $this->get(
@@ -746,7 +746,7 @@ class webmasterApi
     public function getSearchUrlEventHistorySamples(string $hostID, ?int $offset = 0, ?int $limit = 100): object
     {
         if ($limit > 100 || $limit < 0) {
-            return $this->errorCritical("Bad limit to {$limit}");
+            return $this->errorCritical("Bad limit to $limit");
         }
 
         return $this->get(
@@ -803,7 +803,7 @@ class webmasterApi
             return $this->errorCritical("Date to can't be smaller then Date from");
         }
         if ($limit > 100 || $limit < 0) {
-            return $this->errorCritical("Bad limit to {$limit}");
+            return $this->errorCritical("Bad limit to $limit");
         }
 
         return $this->get(
@@ -1043,7 +1043,7 @@ class webmasterApi
     public function getOriginalTexts(string $hostID, int $offset = 0, int $limit = 100): object
     {
         if ($limit > 100 || $limit < 0) {
-            return $this->errorCritical("Bad limit to {$limit}");
+            return $this->errorCritical("Bad limit to $limit");
         }
 
         return $this->get('/hosts/' . $hostID . '/original-texts/', ['offset' => $offset, 'limit' => $limit]);
@@ -1101,7 +1101,7 @@ class webmasterApi
     public function getExternalLinks(string $hostID, int $offset = 0, int $limit = 100): object
     {
         if ($limit > 100 || $limit < 0) {
-            return $this->errorCritical("Bad limit to {$limit}");
+            return $this->errorCritical("Bad limit to $limit");
         }
 
         return $this->get(
@@ -1127,7 +1127,7 @@ class webmasterApi
     public function getBrokenLinks(string $hostID, array $indicator = [], int $offset = 0, int $limit = 100): object
     {
         if ($limit > 100 || $limit < 0) {
-            return $this->errorCritical("Bad limit to {$limit}");
+            return $this->errorCritical("Bad limit to $limit");
         }
 
         return $this->get(
@@ -1152,7 +1152,7 @@ class webmasterApi
     public function getBrokenLinksHistory(string $hostID, int $offset = 0, int $limit = 100): object
     {
         if ($limit > 100 || $limit < 0) {
-            return $this->errorCritical("Bad limit to {$limit}");
+            return $this->errorCritical("Bad limit to $limit");
         }
 
         return $this->get(

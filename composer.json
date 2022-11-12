@@ -12,7 +12,6 @@
     {
       "name": "Dmitriy Popov",
       "email": "dima@subdomain.ru",
-      "homepage": "http://subdomain.ru",
       "role": "Author"
     },
     {
@@ -24,13 +23,13 @@
       "name": "Aleksandr Zelenkov",
       "email": "hardworm@gmail.com",
       "role": "co-author"
-    }
+    i}
   ],
   "require-dev": {
-    "squizlabs/php_codesniffer": "^3.5"
+    "squizlabs/php_codesniffer": "^3.7"
   },
   "require": {
-    "php": ">=7.4.0",
+    "php": "^7.4 || ^8.0 || 8.1",
     "ext-curl": "*",
     "ext-json": "*"
   },
